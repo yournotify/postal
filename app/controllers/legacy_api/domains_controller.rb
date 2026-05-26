@@ -16,6 +16,7 @@ module LegacyAPI
 
       domain = Domain.find_by(name: name, server_id: @server.id)
       if domain
+        domain.mark_as_verified if domain.respond_to?(:mark_as_verified) && (!domain.respond_to?(:verified?) || !domain.verified?)
         return render json: { status: "success", data: serialize_domain(domain) }
       end
 
@@ -31,6 +32,8 @@ module LegacyAPI
         domain.owner_type = "Server"
         domain.owner_id = @server.id
       end
+
+      domain.verified_at = Time.now if domain.respond_to?(:verified_at=)
 
       if domain.save
         render json: { status: "success", data: serialize_domain(domain) }
@@ -115,6 +118,7 @@ module LegacyAPI
     def serialize_domain(domain, include_dns: false, include_flags: false)
       out = {
         id: domain.id,
+        uuid: domain.uuid,
         name: domain.name,
         server_id: domain.server_id
       }
@@ -163,18 +167,14 @@ module LegacyAPI
     def build_dns_payload(domain)
       name = domain.name.to_s
 
-      spf_expected = "v=spf1 a mx include:spf.mail.yournotify.net ~all"
+      spf_expected = domain.respond_to?(:spf_record) ? domain.spf_record : "v=spf1 a mx include:#{Postal::Config.dns.spf_include} ~all"
 
-      # IMPORTANT: Postal's UI expects postal-<dkim_identifier>._domainkey.<domain>
-      dkim_host = nil
-      if domain.respond_to?(:dkim_identifier) && domain.dkim_identifier.to_s.strip != ""
-        dkim_host = "postal-#{domain.dkim_identifier}._domainkey.#{name}"
-      end
+      dkim_host = domain.respond_to?(:dkim_record_name) ? domain.dkim_record_name : nil
 
       dkim_value = dkim_txt_value(domain)
 
       rp_host = domain.respond_to?(:return_path_domain) ? domain.return_path_domain : nil
-      rp_expected = "rp.mail.yournotify.net"
+      rp_expected = Postal::Config.dns.return_path_domain
 
       ownership_host = "postal-verification.#{name}"
       ownership_value = nil
