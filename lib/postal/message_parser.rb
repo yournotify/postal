@@ -10,7 +10,7 @@ module Postal
       @actioned = false
       @tracked_links = 0
       @tracked_images = 0
-      @domain = @message.server.track_domains.where(domain: @message.domain, dns_status: "OK").first
+      @domain = resolve_track_domain
 
       return unless @domain
 
@@ -33,6 +33,23 @@ module Postal
     end
 
     private
+
+    def resolve_track_domain
+      sender_track_domain || default_track_domain
+    end
+
+    def sender_track_domain
+      @message.server.track_domains.where(domain: @message.domain, dns_status: "OK").first
+    end
+
+    def default_track_domain
+      full_name = Postal::Config.dns.default_track_domain.to_s.strip.downcase
+      return nil if full_name.empty?
+
+      @message.server.track_domains.ok.includes(:domain).detect do |track_domain|
+        track_domain.full_name.to_s.downcase == full_name
+      end
+    end
 
     def generate
       @mail = Mail.new(@message.raw_message)

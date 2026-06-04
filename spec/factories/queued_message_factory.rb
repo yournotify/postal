@@ -16,6 +16,7 @@
 #  updated_at    :datetime
 #  ip_address_id :integer
 #  message_id    :integer
+#  priority      :integer          default(0), not null
 #  route_id      :integer
 #  server_id     :integer
 #
@@ -23,6 +24,7 @@
 #
 #  index_queued_messages_on_domain      (domain)
 #  index_queued_messages_on_message_id  (message_id)
+#  index_queued_messages_on_priority_and_id  (priority,id)
 #  index_queued_messages_on_server_id   (server_id)
 #
 FactoryBot.define do

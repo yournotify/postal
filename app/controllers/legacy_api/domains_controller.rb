@@ -141,10 +141,10 @@ module LegacyAPI
 
       if include_flags
         out[:dns_ok] = safe_call(domain, :dns_ok?)
-        out[:spf_ok] = safe_call(domain, :check_spf_record!)
-        out[:dkim_ok] = safe_call(domain, :check_dkim_record!)
-        out[:return_path_ok] = safe_call(domain, :check_return_path_record!)
-        out[:mx_ok] = safe_call(domain, :check_mx_records!)
+        out[:spf_ok] = domain_status_ok?(domain, :spf_status)
+        out[:dkim_ok] = domain_status_ok?(domain, :dkim_status)
+        out[:return_path_ok] = domain_status_ok_or_missing?(domain, :return_path_status)
+        out[:mx_ok] = domain_status_ok_or_missing?(domain, :mx_status)
       end
 
       if include_dns
@@ -162,6 +162,16 @@ module LegacyAPI
       rescue
         nil
       end
+    end
+
+    def domain_status_ok?(domain, method_name)
+      return false unless domain.respond_to?(method_name)
+      domain.public_send(method_name).to_s == "OK"
+    end
+
+    def domain_status_ok_or_missing?(domain, method_name)
+      return false unless domain.respond_to?(method_name)
+      %w[OK Missing].include?(domain.public_send(method_name).to_s)
     end
 
     def build_dns_payload(domain)

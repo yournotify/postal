@@ -41,6 +41,18 @@ module Worker
           end
         end
 
+        context "when a priority queued message is behind a normal queued message" do
+          it "locks the priority message first" do
+            normal_message = create(:queued_message, ip_address: nil, retry_after: nil, priority: 0)
+            priority_message = create(:queued_message, ip_address: nil, retry_after: nil, priority: 100)
+            job.call
+            expect(MessageDequeuer).to have_received(:process).with(priority_message, logger: kind_of(Klogger::Logger))
+            expect(priority_message.reload.locked?).to be true
+            expect(normal_message.reload.locked?).to be false
+          end
+        end
+
+
         context "when there is an unlocked queued message without an IP address without a retry time in the past" do
           it "locks the message and calls the service" do
             queued_message = create(:queued_message, ip_address: nil, retry_after: 10.minutes.ago)

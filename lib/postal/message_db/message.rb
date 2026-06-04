@@ -356,7 +356,8 @@ module Postal
           server_id: @database.server_id,
           batch_key: batch_key,
           domain: recipient_domain,
-          route_id: route_id
+          route_id: route_id,
+          priority: QueuedMessage.priority_from_headers(headers)
         }.merge(options))
       end
 

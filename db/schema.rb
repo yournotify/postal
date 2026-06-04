@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_03_11_205229) do
+ActiveRecord::Schema[7.0].define(version: 2026_05_19_120000) do
   create_table "additional_route_endpoints", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.integer "route_id"
     t.string "endpoint_type"
@@ -196,8 +196,10 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_11_205229) do
     t.integer "route_id"
     t.boolean "manual", default: false
     t.string "batch_key"
+    t.integer "priority", default: 0, null: false
     t.index ["domain"], name: "index_queued_messages_on_domain", length: 8
     t.index ["message_id"], name: "index_queued_messages_on_message_id"
+    t.index ["priority", "id"], name: "index_queued_messages_on_priority_and_id"
     t.index ["server_id"], name: "index_queued_messages_on_server_id"
   end
 

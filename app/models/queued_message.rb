@@ -28,6 +28,19 @@
 
 class QueuedMessage < ApplicationRecord
 
+  PRIORITY_HEADER_NAMES = ["x-yn-test", "x-yournotify-priority"].freeze
+  PRIORITY_HEADER_VALUES = ["1", "true", "yes", "test", "high", "urgent", "priority"].freeze
+
+  def self.priority_from_headers(message_headers)
+    priority_header = PRIORITY_HEADER_NAMES.any? do |name|
+      Array(message_headers[name]).any? do |value|
+        PRIORITY_HEADER_VALUES.include?(value.to_s.strip.downcase)
+      end
+    end
+
+    priority_header ? 100 : 0
+  end
+
   include HasMessage
   include HasLocking
 
@@ -72,6 +85,14 @@ class QueuedMessage < ApplicationRecord
       self.class.ready.where(batch_key: batch_key, ip_address_id: ip_address_id, locked_by: nil, locked_at: nil).limit(limit).update_all(locked_by: locker, locked_at: time)
       QueuedMessage.where(batch_key: batch_key, ip_address_id: ip_address_id, locked_by: locker, locked_at: time).where.not(id: id)
     end
+  end
+
+  def priority_header_message?
+    return true if priority.to_i.positive?
+
+    self.class.priority_from_headers(message&.headers || {}).positive?
+  rescue StandardError
+    false
   end
 
 end

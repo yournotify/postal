@@ -43,11 +43,32 @@ module Worker
       #
       # @return [void]
       def lock_message_for_processing
+        return if lock_priority_header_message_for_processing
+
         QueuedMessage.where(ip_address_id: [nil, @ip_addresses])
                      .where(locked_by: nil, locked_at: nil)
                      .ready_with_delayed_retry
+                     .order(priority: :desc, id: :asc)
                      .limit(1)
                      .update_all(locked_by: @locker, locked_at: @lock_time)
+      end
+
+      def lock_priority_header_message_for_processing
+        queued_messages = QueuedMessage.where(ip_address_id: [nil, @ip_addresses])
+                                       .where(locked_by: nil, locked_at: nil)
+                                       .ready_with_delayed_retry
+                                       .order(priority: :desc, id: :asc)
+                                       .limit(Postal::Config.postal.batch_queued_messages_limit)
+
+        queued_messages.each do |queued_message|
+          next unless queued_message.priority_header_message?
+
+          locked_count = QueuedMessage.where(id: queued_message.id, locked_by: nil, locked_at: nil)
+                                      .update_all(locked_by: @locker, locked_at: @lock_time)
+          return true if locked_count.positive?
+        end
+
+        false
       end
 
       # Get a full list of all messages which we can process (i.e. those which have just

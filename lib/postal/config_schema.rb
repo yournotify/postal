@@ -340,6 +340,10 @@ module Postal
         default "track.postal.example.com"
       end
 
+      string :default_track_domain do
+        description "A full tracking hostname to use as a fallback when a sender domain has no sender-specific tracking domain configured"
+      end
+
       string :helo_hostname do
         description "The hostname to use in HELO/EHLO when connecting to external SMTP servers"
       end

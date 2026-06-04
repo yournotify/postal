@@ -16,6 +16,7 @@
 #  updated_at    :datetime
 #  ip_address_id :integer
 #  message_id    :integer
+#  priority      :integer          default(0), not null
 #  route_id      :integer
 #  server_id     :integer
 #
@@ -23,6 +24,7 @@
 #
 #  index_queued_messages_on_domain      (domain)
 #  index_queued_messages_on_message_id  (message_id)
+#  index_queued_messages_on_priority_and_id  (priority,id)
 #  index_queued_messages_on_server_id   (server_id)
 #
 require "rails_helper"
@@ -49,6 +51,26 @@ RSpec.describe QueuedMessage do
         create(:queued_message, retry_after: 1.minute.from_now)
         expect(described_class.ready_with_delayed_retry.order(:id)).to eq [message1, message2]
       end
+    end
+  end
+
+  describe ".priority_from_headers" do
+    it "marks Yournotify test headers as priority" do
+      expect(described_class.priority_from_headers({ "x-yn-test" => ["1"] })).to eq(100)
+      expect(described_class.priority_from_headers({ "x-yournotify-priority" => ["test"] })).to eq(100)
+    end
+
+    it "leaves normal messages at default priority" do
+      expect(described_class.priority_from_headers({ "x-yournotify-priority" => ["normal"] })).to eq(0)
+      expect(described_class.priority_from_headers({})).to eq(0)
+    end
+  end
+
+  describe "#priority_header_message?" do
+    it "treats stored priority as priority without loading the backend message" do
+      queued_message = build(:queued_message, priority: 100)
+      expect(queued_message).not_to receive(:message)
+      expect(queued_message.priority_header_message?).to be true
     end
   end
 
