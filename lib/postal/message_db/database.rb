@@ -70,7 +70,7 @@ module Postal
       # Return the total size of all stored messages
       #
       def total_size
-        query("SELECT SUM(size) AS size FROM `#{database_name}`.`raw_message_sizes`").first["size"] || 0
+        query("SELECT SUM(raw_message_sizes.size) AS size FROM `#{database_name}`.`raw_message_sizes` AS raw_message_sizes INNER JOIN `information_schema`.`tables` AS message_tables ON message_tables.table_schema = '#{database_name}' AND message_tables.table_name = raw_message_sizes.table_name").first["size"] || 0
       end
 
       #

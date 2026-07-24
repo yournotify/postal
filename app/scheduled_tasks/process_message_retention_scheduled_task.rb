@@ -7,12 +7,20 @@ class ProcessMessageRetentionScheduledTask < ApplicationScheduledTask
       if server.raw_message_retention_days
         # If the server has a maximum number of retained raw messages, remove any that are older than this
         logger.info "Tidying raw messages (by days) for #{server.permalink} (ID: #{server.id}). Keeping #{server.raw_message_retention_days} days."
-        server.message_db.provisioner.remove_raw_tables_older_than(server.raw_message_retention_days)
+        begin
+          server.message_db.provisioner.remove_raw_tables_older_than(server.raw_message_retention_days)
+        rescue Mysql2::Error => e
+          logger.error "Failed tidying raw messages (by days) for #{server.permalink} (ID: #{server.id}): #{e.message}"
+        end
       end
 
       if server.raw_message_retention_size
         logger.info "Tidying raw messages (by size) for #{server.permalink} (ID: #{server.id}). Keeping #{server.raw_message_retention_size} MB of data."
-        server.message_db.provisioner.remove_raw_tables_until_less_than_size(server.raw_message_retention_size * 1024 * 1024)
+        begin
+          server.message_db.provisioner.remove_raw_tables_until_less_than_size(server.raw_message_retention_size * 1024 * 1024)
+        rescue Mysql2::Error => e
+          logger.error "Failed tidying raw messages (by size) for #{server.permalink} (ID: #{server.id}): #{e.message}"
+        end
       end
 
       if server.message_retention_days

@@ -145,14 +145,24 @@ module Postal
       # Remove raw message tables in order order until size is under the given size (given in MB)
       #
       def remove_raw_tables_until_less_than_size(size)
+        remove_orphaned_raw_message_sizes
         tables = raw_tables(nil)
         tables_removed = []
         until @database.total_size <= size
           table = tables.shift
+          break unless table
           tables_removed << table
-          remove_raw_table(table)
+          begin
+            remove_raw_table(table)
+          rescue Mysql2::Error => e
+            raise unless e.message =~ /Unknown table/
+          end
         end
         tables_removed
+      end
+
+      def remove_orphaned_raw_message_sizes
+        @database.query("DELETE FROM `#{@database.database_name}`.`raw_message_sizes` WHERE table_name NOT IN (SELECT table_name FROM `information_schema`.`tables` WHERE table_schema = '#{@database.database_name}' AND table_name LIKE 'raw-%')")
       end
 
       private
