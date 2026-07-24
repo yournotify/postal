@@ -26,6 +26,16 @@ Read-only inventory on 2026-07-24:
 - SMTP advertises STARTTLS but the handshake terminates before presenting a
   certificate. Repair and verify certificate synchronization before restarting
   or upgrading the SMTP container.
+- Selar has three tracking-domain rows. `click.smtp.selarapp.com` is verified,
+  while `click.selar.com` is missing and `click.selar.co` is invalid.
+- Selar's Caddy configuration is static. It has no certificate watcher, tracking
+  host sync, queue cleaner, held-message releaser, disk guard, or link-pruner
+  systemd units.
+- Selar lacks the promotional node's queue-ready, server/message, and composite
+  suppression indexes.
+- Selar has no HTTP route endpoints and one enabled HTTPS webhook. Its destination
+  is a public AWS API Gateway hostname, so the new SSRF guard does not require a
+  private-destination allowlist entry.
 
 ## Prepared application baseline
 
@@ -37,6 +47,45 @@ Read-only inventory on 2026-07-24:
 - Suppression cleaner and conservative held-message releaser.
 - Raw-message retention recovery.
 - Caddy-to-Postal SMTP certificate synchronization scripts.
+- DNS-verified Postal tracking-domain synchronization into a marked Caddy block.
+- Dotted tracking labels such as `click.smtp`, formerly carried only by the
+  promotional web image's `clickdots` patch.
+
+## Reference-node findings
+
+The promotional node uses two separate sources of truth for click domains:
+
+1. Postal's `track_domains` table records the domains Postal has DNS-verified.
+   A minute timer turns those rows into explicit Caddy sites.
+2. Yournotify's `sender_click_domains` table authorizes Caddy on-demand TLS
+   through `/health/caddy/track-domain/allow`, scoped by delivery region.
+
+On 2026-07-24, Postal had 24 verified click domains for the promotional node,
+but the Yournotify API authorized only 12 for `promotional-01`. The existing
+sync script explicitly provisions all 24, which bypasses the authorization API
+for the other 12. Do not copy that drift to Selar. Selar is not represented in
+Yournotify's account database, so its safe initial model is:
+
+- static Caddy sites for `smtp.selarapp.com`, `click.smtp.selarapp.com`, and
+  `track.smtp.selarapp.com`;
+- managed Caddy sites only for Postal rows whose DNS state is `OK`;
+- no public on-demand TLS catch-all unless Selar gains its own authorization
+  endpoint and region mapping.
+
+The versioned sync script preserves the static Caddy configuration and only
+rewrites content between explicit managed markers. It also ignores a verified
+hostname already present in a static block, preventing duplicate Caddy sites.
+
+The `X-Postal-Track-Host` header in the old Caddy configuration has no consumer
+in the running Postal application and is not required by the new managed block.
+Set `POSTAL_TRACK_SYNC_DRY_RUN=1` to render the proposed complete Caddyfile
+without changing or reloading Caddy.
+
+The promotional host is currently at 98% root-disk utilization. It is suitable
+as a behavior reference, but it should not receive an image upgrade until space
+has been reclaimed and backups have been verified. It also runs 24 worker
+containers even though its persisted scale and post-start hook specify 20; use
+the persisted value as intent and treat the extra four containers as drift.
 
 ## Configuration corrections
 
@@ -74,19 +123,31 @@ HTTP routes before setting `postal.allowed_request_destinations`.
    units, certificate hooks, and the current Docker image IDs.
 7. Record Caddy's active configuration and validate its on-demand TLS policy.
 8. Confirm the SMTP certificate, key permissions, issuer, expiry, and renewal.
+9. Reconcile Postal-verified click domains against the system allowed to issue
+   certificates for that node; do not assume the two databases agree.
 
 ## Migration order
 
 1. Build and test the 3.3.7 Yournotify image without deploying it.
-2. Drain or reduce the queue before altering `queued_messages`.
-3. Apply Postal migrations through Postal's update command.
-4. Add operational indexes one at a time and observe MariaDB locks.
-5. Start one web, one SMTP, and one worker container.
-6. Verify login, API domain operations, SMTP AUTH, DKIM, return path, tracking,
+2. Synchronize Caddy's valid certificate and key into Postal, verify their
+   hostname, expiry, and key match, then verify STARTTLS before any wider restart.
+3. Install the certificate watcher so future Caddy renewals update Postal.
+4. Drain or reduce the queue before altering `queued_messages`.
+5. Apply Postal migrations through Postal's update command.
+6. Add operational indexes one at a time and observe MariaDB locks.
+7. Add the managed Caddy markers and run the tracking sync once before enabling
+   its minute timer.
+8. Start one web, one SMTP, and one worker container.
+9. Verify login, API domain operations, SMTP AUTH, DKIM, return path, tracking,
    webhook delivery, suppression behavior, and certificate presentation.
-7. Increase worker concurrency according to Selar's resources and metrics.
-8. Enable the suppression cleaner only after comparing its candidate count.
-9. Run the held-message releaser in dry-run mode before enabling its timer.
+10. Increase worker concurrency according to Selar's resources and metrics.
+11. Enable the suppression cleaner only after comparing its candidate count.
+12. Run the held-message releaser in dry-run mode before enabling its timer.
+
+Selar's Compose project is `install`, so operations that scale services must set
+`POSTAL_COMPOSE_PROJECT=install`. Its application containers are
+`install-web-1`, `install-smtp-1`, and `install-worker-1`; the shared Caddy and
+MariaDB containers remain `postal-caddy` and `postal-mariadb`.
 
 ## Rollback boundary
 

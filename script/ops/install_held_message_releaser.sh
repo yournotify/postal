@@ -6,6 +6,7 @@ min_age_minutes="${YN_HELD_MESSAGE_RELEASER_MIN_AGE_MINUTES:-15}"
 allow_pattern="${YN_HELD_MESSAGE_RELEASER_ALLOW_PATTERN:-send limit}"
 config_dir="/opt/postal/config"
 script_dir="${config_dir}/scripts"
+mariadb_container="${POSTAL_MARIADB_CONTAINER:-postal-mariadb}"
 
 mkdir -p "${script_dir}"
 install -m 0644 "$(dirname "$0")/held_message_releaser.rb" "${script_dir}/held_message_releaser.rb"
@@ -13,14 +14,14 @@ install -m 0644 "$(dirname "$0")/held_message_releaser.rb" "${script_dir}/held_m
 MYSQL_PWD=$(awk '/main_db:/{f=1} f&&/password:/{print $2; exit}' "${config_dir}/postal.yml")
 export MYSQL_PWD
 
-docker exec -e MYSQL_PWD postal-mariadb mariadb -uroot -e \
+docker exec -e MYSQL_PWD "${mariadb_container}" mariadb -uroot -e \
   "CREATE INDEX IF NOT EXISTS yn_queued_server_message ON postal.queued_messages (server_id, message_id);"
 
 cat > /usr/local/sbin/postal-held-message-releaser <<'SH'
 #!/bin/bash
 set -euo pipefail
 exec flock -n /run/postal-held-message-releaser.lock bash -c '
-container=$(docker ps --format "{{.Names}}" | grep -E "^postal-worker-" | sort -V | head -n 1)
+container=$(docker ps --format "{{.Names}}" | grep -E "${POSTAL_WORKER_CONTAINER_PATTERN:-(^|-)worker-[0-9]+$}" | sort -V | head -n 1)
 if [[ -z "${container}" ]]; then
   echo "No postal worker container found" >&2
   exit 1

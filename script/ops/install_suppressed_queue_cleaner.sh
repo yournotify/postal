@@ -6,6 +6,8 @@ cleaner_limit="${YN_SUPPRESSED_QUEUE_CLEANER_LIMIT:-2000}"
 install_dir="/opt/postal/install"
 config_dir="/opt/postal/config"
 script_dir="${config_dir}/scripts"
+mariadb_container="${POSTAL_MARIADB_CONTAINER:-postal-mariadb}"
+compose_project="${POSTAL_COMPOSE_PROJECT:-postal}"
 
 mkdir -p "${script_dir}"
 install -m 0644 "$(dirname "$0")/suppressed_queue_cleaner.rb" "${script_dir}/suppressed_queue_cleaner.rb"
@@ -13,20 +15,20 @@ install -m 0644 "$(dirname "$0")/suppressed_queue_cleaner.rb" "${script_dir}/sup
 MYSQL_PWD=$(awk '/main_db:/{f=1} f&&/password:/{print $2; exit}' "${config_dir}/postal.yml")
 export MYSQL_PWD
 
-message_dbs=$(docker exec -e MYSQL_PWD postal-mariadb mariadb -uroot -Nse "SELECT CONCAT('postal-server-', id) FROM postal.servers")
+message_dbs=$(docker exec -e MYSQL_PWD "${mariadb_container}" mariadb -uroot -Nse "SELECT CONCAT('postal-server-', id) FROM postal.servers")
 for db_name in ${message_dbs}; do
-  docker exec -e MYSQL_PWD postal-mariadb mariadb -uroot -e \
+  docker exec -e MYSQL_PWD "${mariadb_container}" mariadb -uroot -e \
     "CREATE INDEX IF NOT EXISTS yn_suppressions_type_address_keep_until ON \`${db_name}\`.suppressions (type, address, keep_until);"
 done
 
-docker exec -e MYSQL_PWD postal-mariadb mariadb -uroot -e \
+docker exec -e MYSQL_PWD "${mariadb_container}" mariadb -uroot -e \
   "CREATE INDEX IF NOT EXISTS yn_queued_ready_priority ON postal.queued_messages (ip_address_id, locked_by, locked_at, retry_after, priority, id);"
 
 cat > /usr/local/sbin/postal-suppressed-queue-cleaner <<'SH'
 #!/bin/bash
 set -euo pipefail
 exec flock -n /run/postal-suppressed-queue-cleaner.lock bash -c '
-container=$(docker ps --format "{{.Names}}" | grep -E "^postal-worker-" | sort -V | head -n 1)
+container=$(docker ps --format "{{.Names}}" | grep -E "${POSTAL_WORKER_CONTAINER_PATTERN:-(^|-)worker-[0-9]+$}" | sort -V | head -n 1)
 if [[ -z "${container}" ]]; then
   echo "No postal worker container found" >&2
   exit 1
@@ -70,14 +72,14 @@ systemctl enable --now postal-suppressed-queue-cleaner.timer
 
 if [[ -n "${worker_scale}" ]]; then
   cd "${install_dir}"
-  docker compose -p postal up -d --no-deps --scale "worker=${worker_scale}" worker
+  docker compose -p "${compose_project}" up -d --no-deps --scale "worker=${worker_scale}" worker
   printf '%s\n' "${worker_scale}" > worker-replicas
   mkdir -p hooks
   cat > hooks/post-start <<EOF
 #!/bin/bash
 set -e
 cd ${install_dir}
-docker compose -p postal up -d --no-deps --scale worker=${worker_scale} worker
+docker compose -p ${compose_project} up -d --no-deps --scale worker=${worker_scale} worker
 EOF
   chmod +x hooks/post-start
 fi

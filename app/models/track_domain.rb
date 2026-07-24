@@ -29,7 +29,10 @@ class TrackDomain < ApplicationRecord
   belongs_to :server
   belongs_to :domain
 
-  validates :name, presence: true, format: { with: /\A[a-z0-9-]+\z/ }, uniqueness: { scope: :domain_id, case_sensitive: false, message: "is already added" }
+  validates :name,
+            presence: true,
+            format: { with: /\A[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\z/ },
+            uniqueness: { scope: :domain_id, case_sensitive: false, message: "is already added" }
   validates :domain_id, uniqueness: { scope: :server_id, case_sensitive: false, message: "already has a track domain for this server" }
   validate :validate_domain_belongs_to_server
 
