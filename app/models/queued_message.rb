@@ -28,8 +28,8 @@
 
 class QueuedMessage < ApplicationRecord
 
-  PRIORITY_HEADER_NAMES = ["x-yn-test", "x-yournotify-priority"].freeze
-  PRIORITY_HEADER_VALUES = ["1", "true", "yes", "test", "high", "urgent", "priority"].freeze
+  PRIORITY_HEADER_NAMES = %w[x-yn-test x-yournotify-priority].freeze
+  PRIORITY_HEADER_VALUES = %w[1 true yes test high urgent priority].freeze
 
   def self.priority_from_headers(message_headers)
     priority_header = PRIORITY_HEADER_NAMES.any? do |name|

@@ -40,6 +40,16 @@ Omit it when you only want the cleaner and indexes.
 - `smtp.yournotify.net` / transactional: 2 vCPU, 4 GB RAM, 1 worker container with existing internal worker threads.
 - promotional-02 should use the same cleaner and indexes from day one. For a same-size promotional-02, use 20 workers unless host metrics support more.
 
+Postal v3 uses the singular `worker.threads` configuration path. A
+`workers: { threads: ... }` section is ignored and leaves the runtime at the
+default of two threads per worker container. Always confirm the effective value
+inside the image before changing either container count or thread count:
+
+```bash
+docker exec postal-web-1 bundle exec rails runner \
+  'puts Postal::Config.worker.threads'
+```
+
 ## Verification
 
 ```bash

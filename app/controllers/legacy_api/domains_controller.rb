@@ -5,6 +5,7 @@ require "resolv"
 
 module LegacyAPI
   class DomainsController < BaseController
+
     before_action :load_server!
 
     def create
@@ -66,11 +67,12 @@ module LegacyAPI
         if domain.respond_to?(:check_dns)
           begin
             domain.check_dns(:manual)
-          rescue
+          rescue StandardError
             domain.check_dns
           end
         end
-      rescue
+      rescue StandardError => e
+        Rails.logger.warn("Postal domain DNS refresh failed domain=#{domain.id}: #{e.class}: #{e.message}")
       end
 
       render json: { status: "success", data: serialize_domain(domain, include_dns: true, include_flags: true) }
@@ -100,19 +102,19 @@ module LegacyAPI
       if defined?(Credential)
         begin
           cred = Credential.where(key: key).first
-        rescue
+        rescue StandardError
           cred = nil
         end
       end
 
-      unless cred && cred.respond_to?(:server_id) && cred.server_id
+      unless cred&.server_id
         return render json: { status: "error", message: "Invalid API key" }, status: 401
       end
 
       @server = Server.find_by(id: cred.server_id)
-      unless @server
-        return render json: { status: "error", message: "Server not found" }, status: 401
-      end
+      return if @server
+
+      render json: { status: "error", message: "Server not found" }, status: 401
     end
 
     def serialize_domain(domain, include_dns: false, include_flags: false)
@@ -156,21 +158,23 @@ module LegacyAPI
 
     def safe_call(obj, method_name)
       return nil unless obj.respond_to?(method_name)
+
       begin
-        v = obj.public_send(method_name)
-        !!v
-      rescue
+        obj.public_send(method_name) ? true : false
+      rescue StandardError
         nil
       end
     end
 
     def domain_status_ok?(domain, method_name)
       return false unless domain.respond_to?(method_name)
+
       domain.public_send(method_name).to_s == "OK"
     end
 
     def domain_status_ok_or_missing?(domain, method_name)
       return false unless domain.respond_to?(method_name)
+
       %w[OK Missing].include?(domain.public_send(method_name).to_s)
     end
 
@@ -192,7 +196,7 @@ module LegacyAPI
       if domain.respond_to?(:dns_verification_string)
         begin
           ownership_value = domain.dns_verification_string
-        rescue
+        rescue StandardError
           ownership_value = nil
         end
       end
@@ -221,14 +225,15 @@ module LegacyAPI
         pub_pem = rsa.public_key.to_pem
 
         b64 = pub_pem
-          .gsub("-----BEGIN PUBLIC KEY-----", "")
-          .gsub("-----END PUBLIC KEY-----", "")
-          .gsub(/\s+/, "")
+              .gsub("-----BEGIN PUBLIC KEY-----", "")
+              .gsub("-----END PUBLIC KEY-----", "")
+              .gsub(/\s+/, "")
 
         "v=DKIM1; t=s; h=sha256; p=#{b64}"
-      rescue
+      rescue StandardError
         nil
       end
     end
+
   end
 end

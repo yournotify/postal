@@ -33,7 +33,7 @@ BRANCH
 
 .rubocop-https*
 .env*
+.DS_Store
 
 node_modules
 yarn.lock
-

@@ -151,6 +151,7 @@ module Postal
         until @database.total_size <= size
           table = tables.shift
           break unless table
+
           tables_removed << table
           begin
             remove_raw_table(table)
@@ -162,7 +163,15 @@ module Postal
       end
 
       def remove_orphaned_raw_message_sizes
-        @database.query("DELETE FROM `#{@database.database_name}`.`raw_message_sizes` WHERE table_name NOT IN (SELECT table_name FROM `information_schema`.`tables` WHERE table_schema = '#{@database.database_name}' AND table_name LIKE 'raw-%')")
+        @database.query(<<~SQL.squish)
+          DELETE FROM `#{@database.database_name}`.`raw_message_sizes`
+          WHERE table_name NOT IN (
+            SELECT table_name
+            FROM `information_schema`.`tables`
+            WHERE table_schema = '#{@database.database_name}'
+              AND table_name LIKE 'raw-%'
+          )
+        SQL
       end
 
       private
