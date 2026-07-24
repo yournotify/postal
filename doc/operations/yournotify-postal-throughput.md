@@ -117,3 +117,20 @@ GROUP BY LEFT(COALESCE(d.details, ''), 140)
 ORDER BY count DESC
 LIMIT 20;
 ```
+
+## Raw Message Disk Guard
+
+Postal's built-in raw-message size retention runs at 03:00 and removes whole
+daily raw tables. A busy node can therefore exceed its configured size by a
+full day's raw traffic before cleanup. Install the hourly enforcer to apply the
+existing per-server `raw_message_retention_size` throughout the day:
+
+```bash
+cd /path/to/postal
+sudo script/ops/install_raw_message_retention_enforcer.sh
+```
+
+The timer runs at ten minutes past each hour to avoid overlapping Postal's
+built-in 03:00 retention task. It does not change the configured retention
+limit. It only invokes Postal's normal table-removal method when the recorded
+raw-message size is already over that limit.
