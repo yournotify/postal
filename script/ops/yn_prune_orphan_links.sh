@@ -4,6 +4,7 @@ set -euo pipefail
 database_name="${YN_MESSAGE_DB_NAME:?Set YN_MESSAGE_DB_NAME to a postal-server-N database}"
 batch_size="${YN_LINK_PRUNE_BATCH_SIZE:-50000}"
 max_batches="${YN_LINK_PRUNE_MAX_BATCHES:-10}"
+retention_days="${YN_LINK_RETENTION_DAYS:-30}"
 config_file="${POSTAL_CONFIG_FILE:-/opt/postal/config/postal.yml}"
 client_config="/tmp/yn-client-${$}.cnf"
 database_password=$(awk '/main_db:/,/message_db:/ { if ($1 == "password:") print $2 }' "${config_file}")
@@ -18,6 +19,10 @@ database_password=$(awk '/main_db:/,/message_db:/ { if ($1 == "password:") print
 }
 [[ "${max_batches}" =~ ^[1-9][0-9]*$ ]] || {
   echo "YN_LINK_PRUNE_MAX_BATCHES must be a positive integer" >&2
+  exit 1
+}
+[[ "${retention_days}" =~ ^[1-9][0-9]*$ ]] || {
+  echo "YN_LINK_RETENTION_DAYS must be a positive integer" >&2
   exit 1
 }
 
@@ -41,17 +46,19 @@ run_sql() {
 }
 
 minimum_message_id=$(run_sql "SELECT COALESCE(MIN(id),0) FROM \`${database_name}\`.messages;")
+cutoff="UNIX_TIMESTAMP(UTC_TIMESTAMP() - INTERVAL ${retention_days} DAY)"
 if [[ -z "${minimum_message_id}" || "${minimum_message_id}" == "0" ]]; then
-  echo "No retained messages found; refusing to prune links"
-  exit 0
+  deletion_predicate="timestamp < ${cutoff}"
+else
+  deletion_predicate="message_id < ${minimum_message_id} AND timestamp < ${cutoff}"
 fi
 
 total_deleted=0
 for ((batch = 1; batch <= max_batches; batch++)); do
-  deleted=$(run_sql "DELETE FROM \`${database_name}\`.links WHERE message_id < ${minimum_message_id} ORDER BY message_id LIMIT ${batch_size}; SELECT ROW_COUNT();" | tail -1)
+  deleted=$(run_sql "DELETE FROM \`${database_name}\`.links WHERE ${deletion_predicate} ORDER BY message_id LIMIT ${batch_size}; SELECT ROW_COUNT();" | tail -1)
   deleted=${deleted:-0}
   total_deleted=$((total_deleted + deleted))
-  echo "batch=${batch} min_message_id=${minimum_message_id} deleted=${deleted} total_deleted=${total_deleted}"
+  echo "batch=${batch} retention_days=${retention_days} min_message_id=${minimum_message_id} deleted=${deleted} total_deleted=${total_deleted}"
   if [[ "${deleted}" -lt "${batch_size}" ]]; then
     break
   fi

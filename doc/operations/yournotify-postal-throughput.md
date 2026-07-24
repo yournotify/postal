@@ -134,3 +134,37 @@ The timer runs at ten minutes past each hour to avoid overlapping Postal's
 built-in 03:00 retention task. It does not change the configured retention
 limit. It only invokes Postal's normal table-removal method when the recorded
 raw-message size is already over that limit.
+
+## Tracking Link Retention
+
+Tracking redirects depend on the token-to-URL row in the message database's
+`links` table. Raw-message cleanup does not remove those rows, and a redirect
+still works after its parent message history has expired. If the link row itself
+is deleted, Postal returns `404 Link not found`.
+
+Keep link retention independent from `message_retention_days`:
+
+```ini
+[Service]
+Environment=YN_LINK_RETENTION_DAYS=30
+```
+
+The orphan-link pruner defaults to 30 days and deletes a row only when both:
+
+- its parent message is outside the retained message-ID range; and
+- the link timestamp is older than `YN_LINK_RETENTION_DAYS`.
+
+Use at least 21 days for promotional mail where recipients may click campaigns
+one or two weeks later; prefer 30 days when capacity allows. Higher-volume nodes
+must project table growth before choosing a longer period. Deleting link rows
+frees pages inside InnoDB but does not immediately shrink the `.ibd` file;
+rebuild the table only during a planned maintenance window when `data_free` is
+material and enough temporary disk space exists.
+
+On `mail.yournotify.net`, the compacted table used about 1 GB for 5.2 million
+rows generated over two days. At that observed rate, 21 days is approximately
+10–11 GB and 30 days is approximately 15 GB. Use 21 days on the current 50 GB
+volume unless the volume is expanded; it still gives a full week of margin
+beyond the two-week click requirement. A sample of recent promotional rows was
+about 25% duplicate message/URL pairs, so future per-message link deduplication
+could reduce this further, but it is not required for the Selar upgrade.

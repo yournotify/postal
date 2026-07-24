@@ -28,6 +28,10 @@ Read-only inventory on 2026-07-24:
   or upgrading the SMTP container.
 - Selar has three tracking-domain rows. `click.smtp.selarapp.com` is verified,
   while `click.selar.com` is missing and `click.selar.co` is invalid.
+- Selar has approximately 10 million tracking-link rows, using about 1.9 GB,
+  with the oldest dating to 2026-03-20. It has no link-pruning timer. Do not
+  install a message-ID-only orphan cleaner: Selar retains message history for
+  five days, but existing tracking links are substantially older.
 - Selar's Caddy configuration is static. It has no certificate watcher, tracking
   host sync, queue cleaner, held-message releaser, disk guard, or link-pruner
   systemd units.
@@ -76,10 +80,11 @@ The versioned sync script preserves the static Caddy configuration and only
 rewrites content between explicit managed markers. It also ignores a verified
 hostname already present in a static block, preventing duplicate Caddy sites.
 
-The `X-Postal-Track-Host` header in the old Caddy configuration has no consumer
-in the running Postal application and is not required by the new managed block.
-Set `POSTAL_TRACK_SYNC_DRY_RUN=1` to render the proposed complete Caddyfile
-without changing or reloading Caddy.
+Every static and managed tracking-domain proxy must send
+`X-Postal-Track-Host: 1`. Postal's tracking middleware uses that header to
+distinguish tracking requests from normal web requests; without it, rewritten
+links do not reach the redirect lookup. Set `POSTAL_TRACK_SYNC_DRY_RUN=1` to
+render the proposed complete Caddyfile without changing or reloading Caddy.
 
 The promotional host is currently at 98% root-disk utilization. It is suitable
 as a behavior reference, but it should not receive an image upgrade until space
@@ -148,6 +153,13 @@ Selar's Compose project is `install`, so operations that scale services must set
 `POSTAL_COMPOSE_PROJECT=install`. Its application containers are
 `install-web-1`, `install-smtp-1`, and `install-worker-1`; the shared Caddy and
 MariaDB containers remain `postal-caddy` and `postal-mariadb`.
+
+Do not enable link pruning during the initial Selar upgrade. Its current link
+growth is modest relative to the approximately 162 GB free disk, so preserving
+the existing redirect history is safer. After the upgrade observation window,
+agree a customer-facing policy before enabling the age-aware cleaner. A
+365-day policy is conservative for Selar's observed footprint and comfortably
+covers one- and two-week-old campaigns.
 
 ## Rollback boundary
 

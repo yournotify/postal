@@ -86,6 +86,7 @@ ${host} {
     header_up X-Real-IP {remote_host}
     header_up X-Forwarded-For {remote_host}
     header_up X-Forwarded-Proto {scheme}
+    header_up X-Postal-Track-Host "1"
   }
 }
 
