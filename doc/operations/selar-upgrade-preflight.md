@@ -4,6 +4,29 @@ This runbook prepares the Yournotify Postal fork for an in-place Selar upgrade.
 Do not deploy until the live Selar image, database schema, queue, certificates,
 host resources, and rollback artifacts have been recorded.
 
+## Observed Selar baseline
+
+Read-only inventory on 2026-07-24:
+
+- SSH origin: `46.226.108.227`, host `smtp.selarapp.com`.
+- Postal image: `yournotify/postal:3.3.5-yournotify`.
+- Image code matches fork commit `c880704`.
+- Docker Compose project/container prefix: `install`, not `postal`.
+- Main schema: `20240311205229`.
+- Message database: `postal-server-1`, schema `20`, about 2.3 GB.
+- Queue: empty during the inventory.
+- `queued_messages.priority`: not installed.
+- MariaDB: 10.11.16.
+- Host: 8 vCPU, 7.2 GiB RAM, approximately 162 GiB disk free.
+- No `/opt/postal/overrides` files or custom Postal systemd timers.
+- Caddy serves the web and tracking hosts, but Postal SMTP certificate files
+  `/config/smtp.crt` and `/config/smtp.key` are missing.
+- Caddy's source certificate exists under `/opt/postal/caddy-data`, is valid
+  through 2026-10-15, and can be synchronized with the versioned Caddy hooks.
+- SMTP advertises STARTTLS but the handshake terminates before presenting a
+  certificate. Repair and verify certificate synchronization before restarting
+  or upgrading the SMTP container.
+
 ## Prepared application baseline
 
 - Postal upstream: 3.3.7.
