@@ -7,12 +7,16 @@ host resources, and rollback artifacts have been recorded.
 ## Completed rollout
 
 The upgrade completed on 2026-07-25 with image
-`yournotify/postal:3.3.7-yournotify-encrypted-links.20260725`.
+`yournotify/postal:3.3.7-yournotify.1`.
 
 - Postal's SMTP certificate was synchronized from Caddy before the application
   upgrade. The certificate watcher now keeps `/config/smtp.crt` and
   `/config/smtp.key` current after Caddy renewals.
 - The guarded tracking-host synchronizer is enabled.
+- `track.smtp.selarapp.com` is the explicit static default when a sender has no
+  verified sender-specific tracking domain.
+- The legacy domain API uses Postal's canonical server-owner scope, so domains
+  created in Postal's UI and through the API are both queryable.
 - Selar has its own off-host-backed-up encrypted tracking-link key.
 - All old random-token link rows were deleted after a verified database backup.
   Old-format URLs return `404`; there is no legacy lookup fallback.
