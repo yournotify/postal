@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "postal/tracking_link"
+
 class TrackingMiddleware
 
   TRACKING_PIXEL = File.read(Rails.root.join("app", "assets", "images", "tracking_pixel.png"))
@@ -20,7 +22,7 @@ class TrackingMiddleware
       server_token = ::Regexp.last_match(1)
       message_token = ::Regexp.last_match(2)
       dispatch_image_request(request, server_token, message_token)
-    when /\A\/([a-z0-9-]+)\/([a-z0-9-]+)/i
+    when /\A\/([a-z0-9-]+)\/([a-z0-9_-]+)\z/i
       server_token = ::Regexp.last_match(1)
       link_token = ::Regexp.last_match(2)
       dispatch_redirect_request(request, server_token, link_token)
@@ -64,38 +66,39 @@ class TrackingMiddleware
       return [404, {}, ["Invalid Server Token"]]
     end
 
-    link = message_db.select(:links, where: { token: link_token }, limit: 1).first
-    if link.nil?
-      return [404, {}, ["Link not found"]]
-    end
+    destination = Postal::TrackingLink.decode(link_token, server_token: server_token)
+    fingerprint = Postal::TrackingLink.fingerprint(link_token)
+    link = message_db.select(:links, where: { token: fingerprint }, limit: 1).first
 
-    time = Time.now.to_f
-    if link["message_id"]
-      message_db.update(:messages, { clicked: time }, where: { id: link["message_id"] })
-      message_db.insert(:clicks, {
-        message_id: link["message_id"],
-        link_id: link["id"],
-        ip_address: request.ip,
-        user_agent: request.user_agent,
-        timestamp: time
-      })
-
+    if link && link["message_id"]
       begin
-        message_webhook_hash = message_db.message(link["message_id"]).webhook_hash
+        message = message_db.message(link["message_id"])
+        time = Time.now.to_f
+        message_db.update(:messages, { clicked: time }, where: { id: link["message_id"] })
+        message_db.insert(:clicks, {
+          message_id: link["message_id"],
+          link_id: link["id"],
+          ip_address: request.ip,
+          user_agent: request.user_agent,
+          timestamp: time
+        })
+
         WebhookRequest.trigger(message_db.server, "MessageLinkClicked", {
-          message: message_webhook_hash,
-          url: link["url"],
-          token: link["token"],
+          message: message.webhook_hash,
+          url: destination,
+          token: link_token,
           ip_address: request.ip,
           user_agent: request.user_agent
         })
       rescue Postal::MessageDB::Message::NotFound
-        # If we can't find the message that this link is associated with, we'll just ignore it
-        # and not trigger any webhooks.
+        # Message retention has removed analytics metadata. The encrypted link
+        # remains independently redirectable.
       end
     end
 
-    [307, { "Location" => link["url"] }, ["Redirected to: #{link['url']}"]]
+    [307, { "Location" => destination }, ["Redirected to: #{destination}"]]
+  rescue Postal::TrackingLink::InvalidToken
+    [404, {}, ["Invalid link"]]
   end
 
   def get_message_db_from_server_token(token)

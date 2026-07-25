@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 ENV["POSTAL_CONFIG_FILE_PATH"] ||= "config/postal/postal.test.yml"
+ENV["POSTAL_TRACKING_LINK_KEYS_PATH"] ||= File.expand_path("fixtures/tracking-keys.yml", __dir__)
 
 require "dotenv"
 Dotenv.load(".env.test")

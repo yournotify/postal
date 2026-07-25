@@ -322,7 +322,8 @@ RSpec.describe "Legacy Messages API", type: :request do
             MessageFactory.outgoing(server) do |msg|
               msg.create_load(double("request", ip: "1.2.3.4", user_agent: "user agent"))
               link = msg.create_link("https://example.com")
-              link_id = msg.database.select(:links, where: { token: link }).first["id"]
+              fingerprint = Postal::TrackingLink.fingerprint(link)
+              link_id = msg.database.select(:links, where: { token: fingerprint }).first["id"]
               msg.database.insert(:clicks, {
                 message_id: msg.id,
                 link_id: link_id,

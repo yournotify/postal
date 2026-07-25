@@ -6,7 +6,7 @@ require "rack/test"
 RSpec.describe TrackingMiddleware do
   include Rack::Test::Methods
 
-  let(:inner_app) { ->(_env) { [200, {}, ["inner"]] } }
+  let(:inner_app) { -> (_env) { [200, {}, ["inner"]] } }
   let(:app) { described_class.new(inner_app) }
 
   let(:server) { create(:server) }
@@ -66,6 +66,49 @@ RSpec.describe TrackingMiddleware do
     it "passes the request through to the inner app untouched" do
       get "/img/#{server.token}/#{message.token}"
       expect(last_response.body).to eq "inner"
+    end
+  end
+
+  describe "GET /:server_token/:encrypted_link (click tracking)" do
+    let(:destination) { "https://example.com/products/42?campaign=summer" }
+    let(:encrypted_token) { Postal::TrackingLink.encode(destination, server_token: server.token) }
+
+    it "redirects without a database row" do
+      get "/#{server.token}/#{encrypted_token}", {}, track_headers
+
+      expect(last_response.status).to eq 307
+      expect(last_response.headers["Location"]).to eq destination
+    end
+
+    it "records analytics while the message and hot link row exist" do
+      message_db = server.message_db
+      message_db.insert(:links, {
+        message_id: message.id,
+        token: Postal::TrackingLink.fingerprint(encrypted_token),
+        hash: Digest::SHA1.hexdigest(destination),
+        url: destination,
+        timestamp: Time.now.to_f
+      })
+
+      expect do
+        get "/#{server.token}/#{encrypted_token}", {}, track_headers
+      end.to change { message_db.select(:clicks).size }.by(1)
+
+      expect(last_response.status).to eq 307
+      expect(last_response.headers["Location"]).to eq destination
+    end
+
+    it "rejects a modified token" do
+      replacement = encrypted_token.end_with?("A") ? "B" : "A"
+      get "/#{server.token}/#{encrypted_token[0...-1]}#{replacement}", {}, track_headers
+
+      expect(last_response.status).to eq 404
+    end
+
+    it "rejects an old random database token" do
+      get "/#{server.token}/K8qP2mN7xL4vR9tB", {}, track_headers
+
+      expect(last_response.status).to eq 404
     end
   end
 end

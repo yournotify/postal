@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../tracking_link"
+
 module Postal
   module MessageDB
     class Message
@@ -489,8 +491,14 @@ module Postal
       #
       def create_link(url)
         hash = Digest::SHA1.hexdigest(url.to_s)
-        token = SecureRandom.alphanumeric(16)
-        database.insert(:links, { message_id: id, hash: hash, url: url, timestamp: Time.now.to_f, token: token })
+        token = Postal::TrackingLink.encode(url, server_token: server.token)
+        database.insert(:links, {
+          message_id: id,
+          hash: hash,
+          url: url,
+          timestamp: Time.now.to_f,
+          token: Postal::TrackingLink.fingerprint(token)
+        })
         token
       end
 

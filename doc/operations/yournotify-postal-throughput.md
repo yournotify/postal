@@ -137,29 +137,31 @@ raw-message size is already over that limit.
 
 ## Tracking Link Retention
 
-Tracking redirects depend on the token-to-URL row in the message database's
-`links` table. Raw-message cleanup does not remove those rows, and a redirect
-still works after its parent message history has expired. If the link row itself
-is deleted, Postal returns `404 Link not found`.
+Postal's encrypted self-contained tracking links do not depend on the
+token-to-URL row after delivery. The row is temporary analytics data and the
+normal message-retention task removes it with its parent message. The encrypted
+URL continues redirecting after both records are gone.
 
-Keep link retention independent from `message_retention_days`:
+The standalone orphan-link pruner is only for installations that still generate
+legacy database-dependent tokens. Do not enable it on encrypted-link nodes:
 
 ```ini
 [Service]
 Environment=YN_LINK_RETENTION_DAYS=30
 ```
 
-The orphan-link pruner defaults to 30 days and deletes a row only when both:
+On a legacy node, the orphan-link pruner defaults to 30 days and deletes a row
+only when both:
 
 - its parent message is outside the retained message-ID range; and
 - the link timestamp is older than `YN_LINK_RETENTION_DAYS`.
 
-Use at least 21 days for promotional mail where recipients may click campaigns
-one or two weeks later; prefer 30 days when capacity allows. Higher-volume nodes
-must project table growth before choosing a longer period. Deleting link rows
-frees pages inside InnoDB but does not immediately shrink the `.ibd` file;
-rebuild the table only during a planned maintenance window when `data_free` is
-material and enough temporary disk space exists.
+On encrypted-link nodes, choose **Message retention days** solely for the
+analytics window. A value of one day keeps one day of Postal metadata and link
+analytics while the redirect itself remains functional indefinitely. Deleting
+link rows frees pages inside InnoDB but does not immediately shrink the `.ibd`
+file; rebuild the table only during a planned maintenance window when
+`data_free` is material and enough temporary disk space exists.
 
 On `mail.yournotify.net`, the compacted table used about 1 GB for 5.2 million
 rows generated over two days. At that observed rate, 21 days is approximately

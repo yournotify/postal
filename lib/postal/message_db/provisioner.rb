@@ -138,6 +138,7 @@ module Postal
         @database.query("DELETE FROM `#{@database.database_name}`.`loads` WHERE `message_id` <= #{id}")
         @database.query("DELETE FROM `#{@database.database_name}`.`deliveries` WHERE `message_id` <= #{id}")
         @database.query("DELETE FROM `#{@database.database_name}`.`spam_checks` WHERE `message_id` <= #{id}")
+        @database.query("DELETE FROM `#{@database.database_name}`.`links` WHERE `message_id` <= #{id}")
         @database.query("DELETE FROM `#{@database.database_name}`.`messages` WHERE `id` <= #{id}")
       end
 

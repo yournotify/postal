@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "base64"
+require "openssl"
+
+path = ARGV.fetch(0, "tracking-keys.yml")
+abort "Refusing to overwrite existing keyring: #{path}" if File.exist?(path)
+
+key = Base64.strict_encode64(OpenSSL::Random.random_bytes(32))
+File.open(path, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+  file.write("active: 1\nkeys:\n  1: #{key}\n")
+end
+
+puts "Created #{path} with mode 0600"

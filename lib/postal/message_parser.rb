@@ -117,13 +117,13 @@ module Postal
       if type == :text
         part.gsub!(/(#{URL_REGEX})(?=\s|$)/) do
           if track_domain?($~[:domain])
-            @tracked_links += 1
             url = $~[:url]
             while url =~ /[^\w]$/
               theend = url.size - 2
               url = url[0..theend]
             end
             token = @message.create_link(url)
+            @tracked_links += 1
             "#{domain}/#{@message.server.token}/#{token}"
           else
             ::Regexp.last_match(0)
@@ -134,9 +134,9 @@ module Postal
       if type == :html
         part.gsub!(/href=(['"])(#{URL_REGEX})['"]/) do
           if track_domain?($~[:domain])
-            @tracked_links += 1
             url = CGI.unescapeHTML($~[:url])
             token = @message.create_link(url)
+            @tracked_links += 1
             "href='#{domain}/#{@message.server.token}/#{token}'"
           else
             ::Regexp.last_match(0)

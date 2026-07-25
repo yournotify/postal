@@ -64,5 +64,6 @@ FROM base AS ci
 # full target - default if no --target option is given
 FROM base AS full
 
-RUN RAILS_GROUPS=assets bundle exec rake assets:precompile
+RUN POSTAL_TRACKING_LINK_KEYS_PATH=/opt/postal/app/spec/fixtures/tracking-keys.yml \
+  RAILS_GROUPS=assets bundle exec rake assets:precompile
 RUN touch /opt/postal/app/public/assets/.prebuilt
