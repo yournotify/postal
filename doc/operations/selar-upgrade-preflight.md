@@ -4,6 +4,23 @@ This runbook prepares the Yournotify Postal fork for an in-place Selar upgrade.
 Do not deploy until the live Selar image, database schema, queue, certificates,
 host resources, and rollback artifacts have been recorded.
 
+## Completed rollout
+
+The upgrade completed on 2026-07-25 with image
+`yournotify/postal:3.3.7-yournotify-encrypted-links.20260725`.
+
+- Postal's SMTP certificate was synchronized from Caddy before the application
+  upgrade. The certificate watcher now keeps `/config/smtp.crt` and
+  `/config/smtp.key` current after Caddy renewals.
+- The guarded tracking-host synchronizer is enabled.
+- Selar has its own off-host-backed-up encrypted tracking-link key.
+- All old random-token link rows were deleted after a verified database backup.
+  Old-format URLs return `404`; there is no legacy lookup fallback.
+- New encrypted links retain the existing two-segment URL shape and continue to
+  redirect after message and link analytics retention removes their rows.
+- Temporary link analytics now follow the dashboard's **Message retention
+  days** setting. Selar remains configured for five days.
+
 ## Observed Selar baseline
 
 Read-only inventory on 2026-07-24:
@@ -86,11 +103,10 @@ distinguish tracking requests from normal web requests; without it, rewritten
 links do not reach the redirect lookup. Set `POSTAL_TRACK_SYNC_DRY_RUN=1` to
 render the proposed complete Caddyfile without changing or reloading Caddy.
 
-The promotional host is currently at 98% root-disk utilization. It is suitable
-as a behavior reference, but it should not receive an image upgrade until space
-has been reclaimed and backups have been verified. It also runs 24 worker
-containers even though its persisted scale and post-start hook specify 20; use
-the persisted value as intent and treat the extra four containers as drift.
+During the 2026-07-24 inventory, the promotional host was at 98% root-disk
+utilization and ran 24 workers despite a persisted scale of 20. Space was
+reclaimed and the encrypted-link rollout restored the intended 20-worker scale
+before Selar was upgraded.
 
 ## Configuration corrections
 
@@ -154,12 +170,10 @@ Selar's Compose project is `install`, so operations that scale services must set
 `install-web-1`, `install-smtp-1`, and `install-worker-1`; the shared Caddy and
 MariaDB containers remain `postal-caddy` and `postal-mariadb`.
 
-Do not enable link pruning during the initial Selar upgrade. Its current link
-growth is modest relative to the approximately 162 GB free disk, so preserving
-the existing redirect history is safer. After the upgrade observation window,
-agree a customer-facing policy before enabling the age-aware cleaner. A
-365-day policy is conservative for Selar's observed footprint and comfortably
-covers one- and two-week-old campaigns.
+Do not install a separate link-pruning timer. Standard message retention now
+removes temporary link analytics together with expired message metadata, while
+the encrypted URL remains independently redirectable. This prevents permanent
+database growth without imposing a click-expiry period.
 
 ## Rollback boundary
 
