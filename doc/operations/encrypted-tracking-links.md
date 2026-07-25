@@ -50,3 +50,14 @@ analytics are written.
 
 Old 16-character database tokens are intentionally rejected. Deleting their
 rows makes previously delivered old-format links return `404`.
+
+## Tracking host selection
+
+A DNS-verified sender-specific tracking domain remains the first choice. When
+none exists, Postal may use the explicitly configured
+`dns.default_track_domain` hostname. The configured value must be a plain valid
+hostname; Postal ignores URLs, paths, and malformed values. Static defaults
+always use HTTPS and enable click and open tracking.
+
+This is only a tracking-host selection fallback. It does not restore legacy
+random-token lookup or permit arbitrary request hosts.

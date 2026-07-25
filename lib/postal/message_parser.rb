@@ -4,6 +4,25 @@ module Postal
   class MessageParser
 
     URL_REGEX = /(?<url>(?<protocol>https?):\/\/(?<domain>[A-Za-z0-9\-.:]+)(?<path>\/[A-Za-z0-9.\/+?&\-_%=~:;()\[\]#]*)?+)/
+    TRACK_HOST_REGEX = /\A[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+\z/
+
+    StaticTrackDomain = Data.define(:full_name) do
+      def track_clicks?
+        true
+      end
+
+      def track_loads?
+        true
+      end
+
+      def use_ssl?
+        true
+      end
+
+      def excluded_click_domains_array
+        []
+      end
+    end
 
     def initialize(message)
       @message = message
@@ -44,11 +63,12 @@ module Postal
 
     def default_track_domain
       full_name = Postal::Config.dns.default_track_domain.to_s.strip.downcase
-      return nil if full_name.empty?
+      return nil unless full_name.match?(TRACK_HOST_REGEX)
 
-      @message.server.track_domains.ok.includes(:domain).detect do |track_domain|
+      stored_domain = @message.server.track_domains.ok.includes(:domain).detect do |track_domain|
         track_domain.full_name.to_s.downcase == full_name
       end
+      stored_domain || StaticTrackDomain.new(full_name: full_name)
     end
 
     def generate

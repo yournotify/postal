@@ -15,23 +15,16 @@ module LegacyAPI
         return render json: { status: "error", message: "Domain name is required" }, status: 422
       end
 
-      domain = Domain.find_by(name: name, server_id: @server.id)
+      domain = domain_scope.find_by(name: name)
       if domain
         domain.mark_as_verified if domain.respond_to?(:mark_as_verified) && (!domain.respond_to?(:verified?) || !domain.verified?)
         return render json: { status: "success", data: serialize_domain(domain) }
       end
 
-      domain = Domain.new
-      domain.server = @server
-      domain.name = name
+      domain = domain_scope.build(name: name)
 
       if domain.respond_to?(:verification_method=)
         domain.verification_method = "DNS"
-      end
-
-      if domain.respond_to?(:owner_type=) && domain.respond_to?(:owner_id=)
-        domain.owner_type = "Server"
-        domain.owner_id = @server.id
       end
 
       domain.verified_at = Time.now if domain.respond_to?(:verified_at=)
@@ -45,7 +38,7 @@ module LegacyAPI
 
     def query
       name = params[:name].to_s.strip.downcase
-      domain = Domain.find_by(name: name, server_id: @server.id)
+      domain = domain_scope.find_by(name: name)
 
       unless domain
         return render json: { status: "error", message: "Domain not found" }, status: 404
@@ -56,7 +49,7 @@ module LegacyAPI
 
     def check
       name = params[:name].to_s.strip.downcase
-      domain = Domain.find_by(name: name, server_id: @server.id)
+      domain = domain_scope.find_by(name: name)
 
       unless domain
         return render json: { status: "error", message: "Domain not found" }, status: 404
@@ -80,7 +73,7 @@ module LegacyAPI
 
     def delete
       name = params[:name].to_s.strip.downcase
-      domain = Domain.find_by(name: name, server_id: @server.id)
+      domain = domain_scope.find_by(name: name)
 
       unless domain
         return render json: { status: "error", message: "Domain not found" }, status: 404
@@ -91,6 +84,10 @@ module LegacyAPI
     end
 
     private
+
+    def domain_scope
+      @server.domains
+    end
 
     def load_server!
       key = request.headers["X-Server-API-Key"].to_s.strip
@@ -122,7 +119,7 @@ module LegacyAPI
         id: domain.id,
         uuid: domain.uuid,
         name: domain.name,
-        server_id: domain.server_id
+        server_id: domain.server_id || (domain.owner_id if domain.owner_type == "Server")
       }
 
       out[:verification_method] = domain.verification_method if domain.respond_to?(:verification_method)
