@@ -25,6 +25,15 @@ done
 docker inspect "${web_container}" "${caddy_container}" >/dev/null
 test -f "${config_file}"
 
+# Older deployments may have either version of the per-minute static-host
+# writer. Stop every retired variant before rendering Caddy so it cannot race
+# this migration or restore an external authorization policy afterward.
+systemctl disable --now postal-track-host-sync.timer >/dev/null 2>&1 || true
+while read -r legacy_timer _; do
+  [[ -n "${legacy_timer}" ]] || continue
+  systemctl disable --now "${legacy_timer}" >/dev/null 2>&1 || true
+done < <(systemctl list-unit-files 'postal-track-sync-*.timer' --no-legend 2>/dev/null || true)
+
 runner_prefix="cd /opt/postal/app && bundle exec rails runner"
 docker exec "${web_container}" sh -lc \
   "${runner_prefix} 'TrackDomain.includes(:domain).order(:id).each { |track_domain| puts track_domain.full_name.downcase }'" \
@@ -216,6 +225,5 @@ if ! docker exec "${caddy_container}" caddy reload --config /etc/caddy/Caddyfile
   exit 1
 fi
 
-systemctl disable --now postal-track-host-sync.timer >/dev/null 2>&1 || true
 echo "Postal on-demand TLS is active; previous Caddyfile: ${backup_file}"
 echo "Authorized tracking domains: $(wc -l < "${authorized_hosts}")"
