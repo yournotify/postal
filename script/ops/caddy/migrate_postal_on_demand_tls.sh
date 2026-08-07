@@ -19,7 +19,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-for command_name in awk curl docker grep install mktemp; do
+for command_name in awk chmod cp curl docker grep install mktemp; do
   command -v "${command_name}" >/dev/null
 done
 docker inspect "${web_container}" "${caddy_container}" >/dev/null
@@ -200,14 +200,17 @@ fi
 
 backup_file="${config_file}.before-postal-on-demand.$(date -u +%Y%m%dT%H%M%SZ)"
 install -m 0644 "${config_file}" "${backup_file}"
-install -m 0644 "${working_config}" "${config_file}"
+cp "${working_config}" "${config_file}"
+chmod 0644 "${config_file}"
 if ! docker exec "${caddy_container}" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile; then
-  install -m 0644 "${backup_file}" "${config_file}"
+  cp "${backup_file}" "${config_file}"
+  chmod 0644 "${config_file}"
   echo "Caddy validation failed; restored ${backup_file}" >&2
   exit 1
 fi
 if ! docker exec "${caddy_container}" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
-  install -m 0644 "${backup_file}" "${config_file}"
+  cp "${backup_file}" "${config_file}"
+  chmod 0644 "${config_file}"
   docker exec "${caddy_container}" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile || true
   echo "Caddy reload failed; restored ${backup_file}" >&2
   exit 1
