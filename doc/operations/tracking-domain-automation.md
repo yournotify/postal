@@ -117,7 +117,8 @@ The migration:
 - creates the on-demand catch-all when absent;
 - validates the complete Caddy configuration before reload;
 - restores the timestamped backup if validation or reload fails; and
-- disables the retired `postal-track-host-sync.timer` after success.
+- disables retired `postal-track-host-sync.timer` and
+  `postal-track-sync-*.timer` static-host writers before migration.
 
 ## Verification
 
