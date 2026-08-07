@@ -73,6 +73,18 @@
   display:flex;
 }
 
+.domainList__guidance {
+  color:#69788f;
+  font-size:12px;
+  line-height:1.5;
+  margin-top:5px;
+  overflow-wrap:anywhere;
+}
+
+.domainList__guidance--warning {
+  color:$orange;
+}
+
 .domainList__check {
   margin-right:15px;
   font-size:12px;

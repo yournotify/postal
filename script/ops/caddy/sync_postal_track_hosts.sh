@@ -4,7 +4,6 @@ set -euo pipefail
 config_file="${POSTAL_CADDY_CONFIG_FILE:-/opt/postal/config/Caddyfile}"
 caddy_container="${POSTAL_CADDY_CONTAINER:-postal-caddy}"
 web_container="${POSTAL_WEB_CONTAINER:-postal-web-1}"
-allow_url="${CADDY_TRACK_ALLOW_URL:-}"
 dry_run="${POSTAL_TRACK_SYNC_DRY_RUN:-0}"
 begin_marker="# BEGIN MANAGED POSTAL TRACK DOMAINS"
 end_marker="# END MANAGED POSTAL TRACK DOMAINS"
@@ -17,7 +16,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-for command_name in docker curl awk; do
+for command_name in docker awk; do
   command -v "${command_name}" >/dev/null
 done
 for required_value in "${config_file}" "${caddy_container}" "${web_container}"; do
@@ -63,14 +62,6 @@ for host in "${track_hosts[@]}"; do
   if host_is_statically_configured "${host}"; then
     echo "Leaving ${host} in the static Caddy configuration"
     continue
-  fi
-  if [[ -n "${allow_url}" ]]; then
-    status=$(curl --get --silent --show-error --output /dev/null --write-out '%{http_code}' \
-      --data-urlencode "domain=${host}" "${allow_url}" || true)
-    if [[ "${status}" != "200" ]]; then
-      echo "Skipping ${host}: authorization endpoint returned HTTP ${status}" >&2
-      continue
-    fi
   fi
   approved_hosts+=("${host}")
 done

@@ -55,6 +55,7 @@ Description=Synchronize Postal tracking domains into Caddy every minute
 OnBootSec=30s
 OnUnitActiveSec=60s
 AccuracySec=10s
+Persistent=true
 Unit=postal-track-host-sync.service
 
 [Install]

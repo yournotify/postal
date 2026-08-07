@@ -28,12 +28,21 @@
               - elsif track_domain.dns_status.nil?
                 %li.domainList__check.domainList__check--neutral-cross CNAME/DNS not checked yet
               - else
-                %li.domainList__check.domainList__check--warning{:title => track_domain.dns_error} CNAME not configured correctly
+                %li.domainList__check.domainList__check--warning CNAME not configured correctly
 
               - if track_domain.ssl_enabled?
                 %li.domainList__check.domainList__check--neutral= link_to "SSL enabled", [:toggle_ssl, organization, @server, track_domain], :remote => true, :method => :post
               - else
                 %li.domainList__check.domainList__check--neutral-cross= link_to "SSL disabled", [:toggle_ssl, organization, @server, track_domain], :remote => true, :method => :post
+
+            %p.domainList__guidance
+              Expected DNS:
+              %code= "#{track_domain.full_name} CNAME #{track_domain.expected_cname}"
+            - if track_domain.dns_status == 'OK'
+              %p.domainList__guidance HTTPS routing is provisioned automatically after verification. Allow up to one minute for Caddy synchronization.
+            - elsif track_domain.dns_error.present?
+              %p.domainList__guidance.domainList__guidance--warning= track_domain.dns_error
+              %p.domainList__guidance HTTPS routing is intentionally not provisioned until this CNAME passes verification.
 
           %ul.domainList__properties
             %li.domainList__links
