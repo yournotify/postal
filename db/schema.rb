@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_05_19_120000) do
+ActiveRecord::Schema[7.0].define(version: 2026_08_07_170000) do
   create_table "additional_route_endpoints", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|
     t.integer "route_id"
     t.string "endpoint_type"
@@ -99,6 +99,7 @@ ActiveRecord::Schema[7.0].define(version: 2026_05_19_120000) do
     t.integer "owner_id"
     t.string "dkim_identifier_string"
     t.boolean "use_for_any"
+    t.index ["name"], name: "index_domains_on_name"
     t.index ["server_id"], name: "index_domains_on_server_id"
     t.index ["uuid"], name: "index_domains_on_uuid", length: 8
   end
@@ -307,6 +308,7 @@ ActiveRecord::Schema[7.0].define(version: 2026_05_19_120000) do
     t.boolean "track_clicks", default: true
     t.boolean "track_loads", default: true
     t.text "excluded_click_domains"
+    t.index ["domain_id", "name"], name: "index_track_domains_on_domain_id_and_name"
   end
 
   create_table "user_invites", id: :integer, charset: "utf8mb4", collation: "utf8mb4_general_ci", force: :cascade do |t|

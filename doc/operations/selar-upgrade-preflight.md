@@ -12,7 +12,8 @@ The upgrade completed on 2026-07-25 with image
 - Postal's SMTP certificate was synchronized from Caddy before the application
   upgrade. The certificate watcher now keeps `/config/smtp.crt` and
   `/config/smtp.key` current after Caddy renewals.
-- The guarded tracking-host synchronizer is enabled.
+- Customer tracking certificates use Caddy On-Demand TLS authorized directly
+  by Selar's local Postal DNS-verification records.
 - `track.smtp.selarapp.com` is the explicit static default when a sender has no
   verified sender-specific tracking domain.
 - The legacy domain API uses Postal's canonical server-owner scope, so domains
@@ -72,40 +73,23 @@ Read-only inventory on 2026-07-24:
 - Suppression cleaner and conservative held-message releaser.
 - Raw-message retention recovery.
 - Caddy-to-Postal SMTP certificate synchronization scripts.
-- DNS-verified Postal tracking-domain synchronization into a marked Caddy block.
+- Local Postal authorization for Caddy On-Demand TLS.
 - Dotted tracking labels such as `click.smtp`, formerly carried only by the
   promotional web image's `clickdots` patch.
 
-## Reference-node findings
+## Tracking-domain standard
 
-The promotional node uses two separate sources of truth for click domains:
+Every deployment uses one source of truth: its own Postal `track_domains`
+table. Caddy asks the local Postal endpoint before issuing an on-demand
+certificate. There is no external account database, region mapping, shared
+token, generated customer-host block, or manual customer-host configuration.
 
-1. Postal's `track_domains` table records the domains Postal has DNS-verified.
-   A minute timer turns those rows into explicit Caddy sites.
-2. Yournotify's `sender_click_domains` table authorizes Caddy on-demand TLS
-   through `/health/caddy/track-domain/allow`, scoped by delivery region.
+Static Caddy sites remain for `smtp.selarapp.com` and the unified default
+`track.smtp.selarapp.com`. Sender-specific customer hosts use the guarded
+on-demand catch-all and must send `X-Postal-Track-Host: 1` to Postal.
 
-On 2026-07-24, Postal had 24 verified click domains for the promotional node,
-but the Yournotify API authorized only 12 for `promotional-01`. The existing
-sync script explicitly provisions all 24, which bypasses the authorization API
-for the other 12. Do not copy that drift to Selar. Selar is not represented in
-Yournotify's account database, so its safe initial model is:
-
-- static Caddy sites for `smtp.selarapp.com`, `click.smtp.selarapp.com`, and
-  `track.smtp.selarapp.com`;
-- managed Caddy sites only for Postal rows whose DNS state is `OK`;
-- no public on-demand TLS catch-all unless Selar gains its own authorization
-  endpoint and region mapping.
-
-The versioned sync script preserves the static Caddy configuration and only
-rewrites content between explicit managed markers. It also ignores a verified
-hostname already present in a static block, preventing duplicate Caddy sites.
-
-Every static and managed tracking-domain proxy must send
-`X-Postal-Track-Host: 1`. Postal's tracking middleware uses that header to
-distinguish tracking requests from normal web requests; without it, rewritten
-links do not reach the redirect lookup. Set `POSTAL_TRACK_SYNC_DRY_RUN=1` to
-render the proposed complete Caddyfile without changing or reloading Caddy.
+See `doc/operations/tracking-domain-automation.md` for the migration and
+verification procedure.
 
 During the 2026-07-24 inventory, the promotional host was at 98% root-disk
 utilization and ran 24 workers despite a persisted scale of 20. Space was
@@ -160,8 +144,8 @@ HTTP routes before setting `postal.allowed_request_destinations`.
 4. Drain or reduce the queue before altering `queued_messages`.
 5. Apply Postal migrations through Postal's update command.
 6. Add operational indexes one at a time and observe MariaDB locks.
-7. Add the managed Caddy markers and run the tracking sync once before enabling
-   its minute timer.
+7. Migrate Caddy to the local Postal-authorized On-Demand TLS standard and
+   verify allowed and denied hostname decisions before reload.
 8. Start one web, one SMTP, and one worker container.
 9. Verify login, API domain operations, SMTP AUTH, DKIM, return path, tracking,
    webhook delivery, suppression behavior, and certificate presentation.

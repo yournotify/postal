@@ -41,6 +41,8 @@ module Postal
     config.middleware.insert_before ActionDispatch::HostAuthorization, TrackingMiddleware
 
     config.hosts << Postal::Config.postal.web_hostname
+    config.hosts << "localhost"
+    config.hosts << "127.0.0.1"
 
     unless Postal::Config.logging.rails_log_enabled?
       config.logger = Logger.new("/dev/null")

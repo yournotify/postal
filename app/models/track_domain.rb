@@ -38,6 +38,13 @@ class TrackDomain < ApplicationRecord
 
   scope :ok, -> { where(dns_status: "OK") }
 
+  scope :caddy_authorized, lambda {
+    ok.where(ssl_enabled: true)
+      .joins(server: :organization)
+      .merge(Server.present.where(suspended_at: nil))
+      .merge(Organization.present.where(suspended_at: nil))
+  }
+
   after_create :check_dns, unless: :dns_status
 
   before_validation do
@@ -46,6 +53,24 @@ class TrackDomain < ApplicationRecord
 
   def full_name
     "#{name}.#{domain.name}"
+  end
+
+  def self.caddy_authorized_for?(hostname)
+    normalized_hostname = hostname.to_s.strip.downcase.delete_suffix(".")
+    return false unless normalized_hostname.length.between?(1, 253)
+    return false unless normalized_hostname.match?(/\A[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+\z/)
+
+    labels = normalized_hostname.split(".")
+    return false if labels.length > 20
+
+    track_domains = arel_table
+    domains = Domain.arel_table
+    exact_name = (1...labels.length).map do |separator|
+      track_domains[:name].eq(labels.first(separator).join("."))
+        .and(domains[:name].eq(labels.drop(separator).join(".")))
+    end.reduce(&:or)
+
+    caddy_authorized.joins(:domain).where(exact_name).exists?
   end
 
   def excluded_click_domains_array

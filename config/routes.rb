@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 Rails.application.routes.draw do
+  get "/health/caddy/track-domain/allow" => "caddy_track_domains#allow"
+
   # Legacy API Routes
   match "/api/v1/send/message" => "legacy_api/send#message", via: [:get, :post, :patch, :put]
   match "/api/v1/send/raw" => "legacy_api/send#raw", via: [:get, :post, :patch, :put]

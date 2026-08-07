@@ -39,10 +39,10 @@
               Expected DNS:
               %code= "#{track_domain.full_name} CNAME #{track_domain.expected_cname}"
             - if track_domain.dns_status == 'OK'
-              %p.domainList__guidance HTTPS routing is provisioned automatically after verification. Allow up to one minute for Caddy synchronization.
+              %p.domainList__guidance HTTPS routing and certificate issuance are authorized automatically by this verified Postal record.
             - elsif track_domain.dns_error.present?
               %p.domainList__guidance.domainList__guidance--warning= track_domain.dns_error
-              %p.domainList__guidance HTTPS routing is intentionally not provisioned until this CNAME passes verification.
+              %p.domainList__guidance HTTPS certificate issuance is intentionally denied until this CNAME passes verification.
 
           %ul.domainList__properties
             %li.domainList__links
