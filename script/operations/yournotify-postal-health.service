@@ -1,0 +1,7 @@
+[Unit]
+Description=Yournotify Postal queue and scheduler health
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /opt/postal/operations/check-postal-queues.sh
+TimeoutStartSec=45
