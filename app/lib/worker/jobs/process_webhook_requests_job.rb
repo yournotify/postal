@@ -8,6 +8,12 @@ module Worker
         @lock_time = Time.current
         @locker = Postal.locker_name_with_suffix(SecureRandom.hex(8))
 
+        # Only recover acknowledgements that cannot cause another HTTP send.
+        # Unknown historical outcomes require reconciliation, not blind replay.
+        WebhookRequest.where("locked_at < ?", 10.minutes.ago)
+                      .where("error LIKE ?", "#{WebhookDeliveryService::ACK_PREFIX}%")
+                      .update_all(locked_by: nil, locked_at: nil)
+
         lock_request_for_processing
         obtain_locked_requests
         process_requests

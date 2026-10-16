@@ -16,8 +16,11 @@ require_relative "error"
 require_relative "config_schema"
 require_relative "legacy_config_source"
 require_relative "signer"
+require_relative "process_identity"
 
 module Postal
+
+  extend ProcessIdentity
 
   class << self
 
@@ -84,14 +87,6 @@ module Postal
         k = Klogger.new(nil, destination: Config.logging.enabled? ? $stdout : "/dev/null", highlight: Config.logging.highlighting_enabled?)
         k.add_destination(graylog_logging_destination) if Config.gelf.host.present?
         k
-      end
-    end
-
-    def process_name
-      @process_name ||= begin
-        "host:#{Socket.gethostname} pid:#{Process.pid}"
-      rescue StandardError
-        "pid:#{Process.pid}"
       end
     end
 
